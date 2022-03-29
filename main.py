@@ -2,6 +2,13 @@ import datetime
 from subprocess import Popen, PIPE
 import  PySimpleGUI as sg
 from PySimpleGUI import VerticalSeparator
+import pandas as pd
+import subprocess
+import re
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+import os
+
 
 try:
     from subprocess import Popen, PIPE
@@ -56,39 +63,60 @@ class Interface:
         self.window.close()
 
 class Journal:
-    def CreateLogFile(self):
-        return "journal" + str(datetime.date.today()) + ".txt"
-
-    def CreateEventList(self):
-        return "event" + str(datetime.date.today()) + ".txt"
+    NameJournalList = "journal" + str(datetime.date.today()) + ".txt"
+    NameEventList = "event" + str(datetime.date.today()) + ".txt"
+    eventList = ['smss.exe', 'csrss.exe', 'csrss.exe', 'winlogon.exe', 'services.exe',
+                 'lsass.exe', 'svchost.exe', 'atieclxx.exe'
+                 'svchost.exe', 'jetbrains-toolbox.exe', 'GoogleDriveFS.exe'
+                  'dllhost.exe', 'ONENOTEM.EXE','chrome.exe']
+    # def CreateFilename(self):
 
     def __init__(self):
-        self.filename = self.CreateLogFile()
-        open(self.filename, 'w')
-        self.eventList = self.CreateEventList()
-        open(self.eventList, 'w')
+        if not os.path.exists(Journal.NameJournalList):
+            # fh = open( Journal.NameJournalList, "w")
+            with open(self.NameJournalList, "w") as fl:
+                fl.write("{:<30} {:<5} {:<10} {:<10} {:<10}".format('Имя образа','PID','Имя сессии',"№ сеанса", "Память"))
+                fl.write("\n")
 
     def PidRead(self):
         """ Чтение потокового ввода от subprocess.communicate() и запись в текстовый файл """
-        for line in Popen('tasklist', stdout=PIPE).stdout.readlines():
-            dline = line.decode('cp866', 'ignore')
-            if dline in open(self.filename).read():  # если строка существует, ...
-                pass  # ... то пропустить, не записывать ...
-            # if mline in open(self.eventList).read():
-                self.ShowData(dline)
-                with open(self.filename, "a+") as fl:  # ... если строка является уникальной, ...
-                    fl.write(dline)
+        # print(*[line.decode('cp866', 'ignore') for line in Popen('tasklist', stdout=PIPE).stdout.readlines()])
+        tasks = subprocess.check_output(['tasklist']).decode('cp866', 'ignore').split("\r\n")
+        p=[]
+        for task in tasks:
+            # if task in open(self.filename).read():  # если строка существует, ...
+            #     pass  # ... то пропустить, не записывать ...            #
+            # with open(self.filename, "a+") as fl:  # ... если строка является уникальной, ...
+            #     fl.write(task)
 
-    def ShowData(self,line):
-        print(line)
+            m = re.match(b'(.*?)\\s+(\\d+)\\s+(\\w+)\\s+(\\w+)\\s+(.*?)\\s.*', task.encode())
+            if m is not None:
+                if m.group(1).decode() in self.eventList:
+                     line = {"Имя образа": m.group(1).decode(),
+                          "PID": m.group(2).decode(),
+                          "Имя сессии": m.group(3).decode(),
+                          "№ сеанса": m.group(4).decode(),
+                          "Память": m.group(5).decode('ascii', 'ignore')}
+                     if line not in p:
+                       p.append(line)
+                       # print ("{:<30} {:<5} {:<10} {:<3} {:<6}".format(m.group(1).decode(),
+                       #                                               m.group(2).decode(),m.group(3).decode(),
+                       #                                               m.group(4).decode(), m.group(5).decode('ascii', 'ignore')))
+                       print("\n")
+                       with open(self.NameJournalList, "a+") as fl:  # ... если строка является уникальной, ...
+                            fl.write("{:<30} {:<5} {:<10} {:<10} {:<10}".format(m.group(1).decode(),
+                                                                     m.group(2).decode(),m.group(3).decode(),
+                                                                     m.group(4).decode(), m.group(5).decode('ascii', 'ignore')))
+                            fl.write("\n")
+
 
 def main():
-    # jour = Journal()
-    # while (True):
-    #     sleep(10)                                                                     # Бесконечное исполнение скрипта. Частота (здесь - 10 сек) - по желанию пользователя.
-    #     jour.PidRead()
-    inter = Interface()
-    inter.DoWindow()
+    jour = Journal()
+    while (True):
+        sleep(10)                                                                     # Бесконечное исполнение скрипта. Частота (здесь - 10 сек) - по желанию пользователя.
+        jour.PidRead()
+    # inter = Interface()
+    # inter.DoWindow()
 
 if __name__ == "__main__":
     main()
